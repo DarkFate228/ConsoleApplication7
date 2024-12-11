@@ -1,9 +1,9 @@
-﻿#include <FL/Fl.H>
+﻿#include <FL/Fl_File_Chooser.H>
+#include <FL/Fl.H>
 #include <FL/Fl_Window.H>
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Input.H>
 #include <FL/Fl_Multiline_Output.H>
-#include <FL/Fl_File_Chooser.H>
 #include <FL/fl_ask.H>
 #include <iostream>
 #include <cmath>
@@ -13,6 +13,7 @@
 
 using namespace std;
 
+// Класс для RSA шифрования
 // Класс для RSA шифрования
 class RSA {
 private:
@@ -87,7 +88,8 @@ private:
         if (file.is_open()) {
             getline(file, text, '\0');
             file.close();
-        } else {
+        }
+        else {
             fl_alert(u8"Не удалось открыть файл.");
         }
         return text;
@@ -98,7 +100,8 @@ private:
         if (file.is_open()) {
             file << text << u8"\nОткрытый ключ: " << n << ", " << e;
             file.close();
-        } else {
+        }
+        else {
             fl_alert(u8"Не удалось сохранить файл.");
         }
     }
@@ -131,7 +134,7 @@ private:
 
         string encrypted_filename = "encrypted.txt";
         app->saveTextToFile(encrypted_filename.c_str(), encrypted_text.str(),
-                            app->rsa.getPublicKeyN(), app->rsa.getPublicKeyE());
+            app->rsa.getPublicKeyN(), app->rsa.getPublicKeyE());
 
         app->output_result->value((u8"Текст зашифрован и сохранён в файл: " + encrypted_filename).c_str());
     }
@@ -145,7 +148,7 @@ private:
         }
 
         string encrypted_message = app->loadTextFromFile(filename);
-        if (encrypted_message.empty()) return;istringstream encrypted_stream(encrypted_message);
+        if (encrypted_message.empty()) return; istringstream encrypted_stream(encrypted_message);
         ostringstream decrypted_text;
         int c;
 
@@ -176,7 +179,7 @@ private:
         const char* filename = fl_file_chooser(u8"Выберите файл для сохранения", "*.txt", nullptr);
         if (filename) {
             app->saveTextToFile(filename, encrypted_text.str(),
-                                app->rsa.getPublicKeyN(), app->rsa.getPublicKeyE());
+                app->rsa.getPublicKeyN(), app->rsa.getPublicKeyE());
             fl_message("Текст успешно зашифрован и сохранён.");
         }
     }
