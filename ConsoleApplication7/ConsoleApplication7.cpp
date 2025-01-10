@@ -180,7 +180,7 @@ private:
         if (filename) {
             app->saveTextToFile(filename, encrypted_text.str(),
                 app->rsa.getPublicKeyN(), app->rsa.getPublicKeyE());
-            fl_message("Текст успешно зашифрован и сохранён.");
+            fl_message(u8"Текст успешно зашифрован и сохранён.");
         }
     }
 
