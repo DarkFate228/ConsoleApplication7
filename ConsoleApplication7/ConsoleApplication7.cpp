@@ -14,12 +14,11 @@
 using namespace std;
 
 // Класс для RSA шифрования
-// Класс для RSA шифрования
 class RSA {
 private:
-    int p, q;       // Простые числа
-    int n, phi;     // Модуль и функция Эйлера
-    int e, d;       // Открытый и закрытый ключи
+    int p, q;
+    int n, phi;
+    int e, d;
 
     int gcd(int a, int b) {
         while (b != 0) {
@@ -33,17 +32,40 @@ private:
     int modInverse(int a, int m) {
         a = a % m;
         for (int x = 1; x < m; x++) {
-            if ((a * x) % m == 1)
-                return x;
+            if ((a * x) % m == 1) return x;
         }
         return -1;
     }
 
+    bool isPrime(int num) {
+        if (num <= 1) return false;
+        for (int i = 2; i <= sqrt(num); i++) {
+            if (num % i == 0) return false;
+        }
+        return true;
+    }
+
 public:
-    RSA() : p(61), q(53) {
+    RSA() : p(61), q(53) { calculateKeys(); }
+
+    void setPrimes(int new_p, int new_q) {
+        if (!isPrime(new_p) || !isPrime(new_q)) {
+            throw invalid_argument(u8"Оба числа должны быть простыми!");
+        }
+        p = new_p;
+        q = new_q;
+        calculateKeys();
+    }
+
+    void calculateKeys() {
         n = p * q;
         phi = (p - 1) * (q - 1);
-        e = 17;
+
+        e = 2;
+        while (e < phi && gcd(e, phi) != 1) {
+            e++;
+        }
+
         d = modInverse(e, phi);
     }
 
@@ -51,7 +73,7 @@ public:
     int getPublicKeyE() const { return e; }
     int getPrivateKey() const { return d; }
 
-    int encrypt(int m) {
+    int encrypt(int m) const {
         long long result = 1;
         for (int i = 0; i < e; i++) {
             result = (result * m) % n;
@@ -59,7 +81,7 @@ public:
         return result;
     }
 
-    int decrypt(int c) {
+    int decrypt(int c) const {
         long long result = 1;
         for (int i = 0; i < d; i++) {
             result = (result * c) % n;
@@ -72,13 +94,17 @@ public:
 class RSAApp {
 private:
     Fl_Window* window;
+    Fl_Input* input_p;
+    Fl_Input* input_q;
+    Fl_Input* input_file_path;
+    Fl_Input* input_text;
+    Fl_Multiline_Output* output_result;
+
+    Fl_Button* btn_set_keys;
     Fl_Button* btn_select_file;
     Fl_Button* btn_encrypt;
     Fl_Button* btn_decrypt;
     Fl_Button* btn_encrypt_input;
-    Fl_Input* input_file_path;
-    Fl_Input* input_text;
-    Fl_Multiline_Output* output_result;
 
     RSA rsa;
 
@@ -106,105 +132,88 @@ private:
         }
     }
 
-    static void onSelectFile(Fl_Widget* btn, void* data) {
-        RSAApp* app = static_cast<RSAApp*>(data);
-        const char* filename = fl_file_chooser(u8"Выберите файл", "*", nullptr);
-        if (filename) {
-            app->input_file_path->value(filename);
-        }
-    }
-
-    static void onEncrypt(Fl_Widget* btn, void* data) {
+    static void onEncryptFile(Fl_Widget* btn, void* data) {
         RSAApp* app = static_cast<RSAApp*>(data);
         const char* filename = app->input_file_path->value();
         if (strlen(filename) == 0) {
-            fl_alert(u8"Выберите файл.");
+            fl_alert(u8"Выберите файл для шифрования.");
             return;
         }
 
-        string message = app->loadTextFromFile(filename);
-        if (message.empty()) return;
+        string content = app->loadTextFromFile(filename);
+        if (content.empty()) return;
 
-        ostringstream encrypted_text;
-        for (char c : message) {
+        ostringstream encrypted_content;
+        for (char c : content) {
             int m = static_cast<int>(c);
             int encrypted_char = app->rsa.encrypt(m);
-            encrypted_text << encrypted_char << " ";
+            encrypted_content << encrypted_char << " ";
         }
 
-        string encrypted_filename = "encrypted.txt";
-        app->saveTextToFile(encrypted_filename.c_str(), encrypted_text.str(),
-            app->rsa.getPublicKeyN(), app->rsa.getPublicKeyE());
+        string output_filename = "encrypted.txt";
+        app->saveTextToFile(output_filename.c_str(), encrypted_content.str(), app->rsa.getPublicKeyN(), app->rsa.getPublicKeyE());
+        fl_message(u8"Файл успешно зашифрован и сохранён как %s", output_filename.c_str());
 
-        app->output_result->value((u8"Текст зашифрован и сохранён в файл: " + encrypted_filename).c_str());
+        app->output_result->value((u8"Текст зашифрован и сохранён в файл: " + output_filename).c_str());
     }
 
-    static void onDecrypt(Fl_Widget* btn, void* data) {
+    static void onDecryptFile(Fl_Widget* btn, void* data) {
         RSAApp* app = static_cast<RSAApp*>(data);
         const char* filename = app->input_file_path->value();
         if (strlen(filename) == 0) {
-            fl_alert(u8"Выберите файл.");
+            fl_alert(u8"Выберите файл для расшифровки.");
             return;
         }
 
-        string encrypted_message = app->loadTextFromFile(filename);
-        if (encrypted_message.empty()) return; istringstream encrypted_stream(encrypted_message);
-        ostringstream decrypted_text;
+        string content = app->loadTextFromFile(filename);
+        if (content.empty()) return;
+
+        istringstream encrypted_content(content);
+        ostringstream decrypted_content;
+        int encrypted_char;
+
+        while (encrypted_content >> encrypted_char) {
+            int decrypted_char = app->rsa.decrypt(encrypted_char);
+            decrypted_content << static_cast<char>(decrypted_char);
+        }
+
+        string output_filename = "decrypted.txt";
+        app->saveTextToFile(output_filename.c_str(), decrypted_content.str(), 0, 0);
+        fl_message(u8"Файл успешно расшифрован и сохранён как %s", output_filename.c_str());
+        
         int c;
-
-        while (encrypted_stream >> c) {
+        while (encrypted_content >> c) {
             int decrypted_char = app->rsa.decrypt(c);
-            decrypted_text << static_cast<char>(decrypted_char);
+            decrypted_content << static_cast<char>(decrypted_char);
         }
 
-        app->output_result->value((u8"Расшифрованный текст: " + decrypted_text.str()).c_str());
-    }
-
-    static void onEncryptInput(Fl_Widget* btn, void* data) {
-        RSAApp* app = static_cast<RSAApp*>(data);
-        const char* text = app->input_text->value();
-
-        if (strlen(text) == 0) {
-            fl_alert(u8"Введите текст для шифрования.");
-            return;
-        }
-
-        ostringstream encrypted_text;
-        for (char c : string(text)) {
-            int m = static_cast<int>(c);
-            int encrypted_char = app->rsa.encrypt(m);
-            encrypted_text << encrypted_char << " ";
-        }
-
-        const char* filename = fl_file_chooser(u8"Выберите файл для сохранения", "*.txt", nullptr);
-        if (filename) {
-            app->saveTextToFile(filename, encrypted_text.str(),
-                app->rsa.getPublicKeyN(), app->rsa.getPublicKeyE());
-            fl_message(u8"Текст успешно зашифрован и сохранён.");
-        }
+        app->output_result->value((u8"Расшифрованный текст: " + decrypted_content.str()).c_str());
     }
 
 public:
     RSAApp() {
-        window = new Fl_Window(490, 350, u8"RSA Шифрование");
+        window = new Fl_Window(490, 400, u8"RSA Шифрование");
 
-        btn_select_file = new Fl_Button(10, 10, 120, 30, u8"Выбрать файл");
-        input_file_path = new Fl_Input(140, 10, 340, 30, "");
+        input_p = new Fl_Input(115, 10, 100, 30, u8"Введите p:");
+        input_q = new Fl_Input(350, 10, 100, 30, u8"Введите q:");
+
+        btn_set_keys = new Fl_Button(10, 50, 460, 30, u8"Установить ключи");
+        btn_set_keys->callback(onSetKeys, this);
+
+        btn_select_file = new Fl_Button(10, 90, 120, 30, u8"Выбрать файл");
+        input_file_path = new Fl_Input(140, 90, 340, 30, "");
         input_file_path->readonly(1);
         btn_select_file->callback(onSelectFile, this);
 
-        input_text = new Fl_Input(115, 50, 365, 30, u8"Введите текст:");
+        btn_encrypt = new Fl_Button(10, 130, 220, 30, u8"Зашифровать файл");
+        btn_encrypt->callback(onEncryptFile, this);
 
-        output_result = new Fl_Multiline_Output(85, 90, 395, 210, u8"Результат:");
+        btn_decrypt = new Fl_Button(240, 130, 220, 30, u8"Расшифровать файл");
+        btn_decrypt->callback(onDecryptFile, this);
 
-        btn_encrypt = new Fl_Button(10, 310, 150, 30, u8"Зашифровать файл");
-        btn_encrypt->callback(onEncrypt, this);
+        input_text = new Fl_Input(115, 170, 365, 30, u8"Введите текст:");
 
-        btn_decrypt = new Fl_Button(170, 310, 150, 30, u8"Расшифровать файл");
-        btn_decrypt->callback(onDecrypt, this);
-
-        btn_encrypt_input = new Fl_Button(330, 310, 150, 30, u8"Зашифровать текст");
-        btn_encrypt_input->callback(onEncryptInput, this);
+        output_result = new Fl_Multiline_Output(85, 210, 395, 150, u8"Результат:");
 
         window->end();
     }
@@ -212,6 +221,36 @@ public:
     void run() {
         window->show();
         Fl::run();
+    }
+
+    static void onSetKeys(Fl_Widget* btn, void* data) {
+        RSAApp* app = static_cast<RSAApp*>(data);
+        const char* p_str = app->input_p->value();
+        const char* q_str = app->input_q->value();
+
+        if (strlen(p_str) == 0 || strlen(q_str) == 0) {
+            fl_alert(u8"Введите значения для p и q.");
+            return;
+        }
+
+        try {
+            int p = stoi(p_str);
+            int q = stoi(q_str);
+            app->rsa.setPrimes(p, q);
+            fl_message(u8"Ключи успешно установлены:\nОткрытый ключ (n, e): (%d, %d)\nЗакрытый ключ: %d",
+                app->rsa.getPublicKeyN(), app->rsa.getPublicKeyE(), app->rsa.getPrivateKey());
+        }
+        catch (invalid_argument& e) {
+            fl_alert("Ошибка: %s", e.what());
+        }
+    }
+
+    static void onSelectFile(Fl_Widget* btn, void* data) {
+        RSAApp* app = static_cast<RSAApp*>(data);
+        const char* filename = fl_file_chooser(u8"Выберите файл", "*", nullptr);
+        if (filename) {
+            app->input_file_path->value(filename);
+        }
     }
 };
 
